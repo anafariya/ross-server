@@ -23,17 +23,14 @@ import {
 } from "../utils/fairnessThresholds";
 import { sanitizeConfig } from "../utils/sanitize";
 import { getAllSecurityPrompts } from "../security";
+import {
+    RESPONSE_KEY_REGEX,
+    RESPONSE_KEY_ERROR_MESSAGE,
+} from "../shared/responseKeyRegex";
 
 const router = Router();
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Dot-and-bracket JSON path expression starting with an identifier, e.g.
-// `data.answers[0].message` or `choices[0].message.content`. Used to validate
-// the Response Output Path field so it can't accept arbitrary text like an
-// email address.
-export const RESPONSE_KEY_REGEX =
-    /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[\d+\])*$/;
 
 // Batch API evaluation schema
 const evaluateApiSchema = z.object({
@@ -42,10 +39,7 @@ const evaluateApiSchema = z.object({
     responseKey: z
         .string()
         .min(1, "Response key is required")
-        .regex(
-            RESPONSE_KEY_REGEX,
-            "Must be a JSON path like data.answers[0].message",
-        ),
+        .regex(RESPONSE_KEY_REGEX, RESPONSE_KEY_ERROR_MESSAGE),
     requestTemplate: z.string().min(1, "Request template is required"),
     apiKey: z.string().nullable().optional(),
     apiKeyPlacement: z.enum(["none", "auth_header", "x_api_key", "query_param", "body_field"]).optional().default("none"),
@@ -688,7 +682,7 @@ router.get("/jobs/:jobId", authenticateToken, async (req, res) => {
         const errorMessage =
             payload.error ||
             (isFailed
-                ? "Job failed without a recorded reason. Please retry or contact support."
+                ? "No reason recorded. Please retry or contact support."
                 : null);
 
         // Normalize status for consistent API responses

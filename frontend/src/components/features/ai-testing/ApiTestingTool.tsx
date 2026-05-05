@@ -15,6 +15,10 @@ import {
   Lock,
 } from "lucide-react";
 import { FALLBACK_PRICES, isPremiumStatus } from "@/lib/constants";
+import {
+  RESPONSE_KEY_REGEX,
+  RESPONSE_KEY_ERROR_MESSAGE,
+} from "@/lib/responseKeyRegex";
 import SubscriptionModal from "@/components/features/subscriptions/SubscriptionModal";
 import { ApiEndpointSkeleton } from "@/components/Skeleton";
 import { ApiHistory } from "@/app/assess/[projectId]/fairness-bias/api-history/components/ApiHistory";
@@ -31,12 +35,6 @@ const DEFAULT_REQUEST_TEMPLATE = `{
 }`;
 
 const PROMPT_PLACEHOLDER_REGEX = /{{\s*prompt\s*}}/i;
-
-// Dot-and-bracket JSON path expression starting with an identifier, e.g.
-// `data.answers[0].message` or `choices[0].message.content`. Must match the
-// backend's RESPONSE_KEY_REGEX in fairness.ts so client-side validation
-// rejects the same inputs the server would (e.g. an email address).
-const RESPONSE_KEY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[\d+\])*$/;
 
 type ApiKeyPlacement = "none" | "auth_header" | "x_api_key" | "query_param" | "body_field";
 
@@ -156,9 +154,7 @@ export default function ApiTestingTool({ mode }: ApiTestingToolProps) {
       return;
     }
     if (!RESPONSE_KEY_REGEX.test(trimmed)) {
-      setResponseKeyError(
-        "Must be a JSON path like data.answers[0].message",
-      );
+      setResponseKeyError(RESPONSE_KEY_ERROR_MESSAGE);
       return;
     }
     setResponseKeyError(null);

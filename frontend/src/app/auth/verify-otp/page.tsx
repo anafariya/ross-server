@@ -34,18 +34,25 @@ export default function VerifyOTPPage() {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Get email from sessionStorage or fallback to query param.
-  // Read the raw query string instead of URLSearchParams.get because the
-  // latter follows form-encoded semantics (decodes "+" to a space), which
-  // corrupts plus-addressed emails like user+tag@example.com.
+  // Get email from the URL query (preferred) or sessionStorage as fallback.
+  // The URL is read with decodeURIComponent — not URLSearchParams.get —
+  // because the latter follows form-encoded semantics and decodes "+" to a
+  // space, corrupting plus-addressed emails like user+tag@example.com.
+  // sessionStorage access is wrapped in try/catch so a hardened browser
+  // (private mode / disabled storage) can't break the bootstrap, and is
+  // only consulted when the URL has no email so a stale stored value
+  // can't override a fresh verification link.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedEmail = sessionStorage.getItem('pendingVerificationEmail');
-      const match = window.location.search.match(/[?&]email=([^&]*)/);
-      const queryEmail = match ? decodeURIComponent(match[1]) : null;
-      const emailValue = storedEmail || queryEmail || "";
-      setEmail(emailValue);
+    if (typeof window === 'undefined') return;
+    const match = window.location.search.match(/[?&]email=([^&]*)/);
+    const queryEmail = match ? decodeURIComponent(match[1]) : null;
+    let storedEmail: string | null = null;
+    try {
+      storedEmail = sessionStorage.getItem('pendingVerificationEmail');
+    } catch {
+      storedEmail = null;
     }
+    setEmail(queryEmail || storedEmail || "");
   }, []);
 
   // Auto-focus first input on mount
