@@ -28,11 +28,24 @@ const router = Router();
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Dot-and-bracket JSON path expression starting with an identifier, e.g.
+// `data.answers[0].message` or `choices[0].message.content`. Used to validate
+// the Response Output Path field so it can't accept arbitrary text like an
+// email address.
+export const RESPONSE_KEY_REGEX =
+    /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[\d+\])*$/;
+
 // Batch API evaluation schema
 const evaluateApiSchema = z.object({
     projectId: z.string().uuid(),
     apiUrl: z.string().url("Invalid API URL"),
-    responseKey: z.string().min(1, "Response key is required"),
+    responseKey: z
+        .string()
+        .min(1, "Response key is required")
+        .regex(
+            RESPONSE_KEY_REGEX,
+            "Must be a JSON path like data.answers[0].message",
+        ),
     requestTemplate: z.string().min(1, "Request template is required"),
     apiKey: z.string().nullable().optional(),
     apiKeyPlacement: z.enum(["none", "auth_header", "x_api_key", "query_param", "body_field"]).optional().default("none"),
@@ -668,7 +681,15 @@ router.get("/jobs/:jobId", authenticateToken, async (req, res) => {
         const summary = payload.summary || null;
         const results = payload.results || [];
         const errors = payload.errors || [];
-        const errorMessage = payload.error || null;
+        // Defense-in-depth fallback: when an Inngest function aborts without
+        // recording a reason, the UI used to show only "Job failed". Surface a
+        // generic message so the user always sees actionable text.
+        const isFailed = String(job.status).toLowerCase() === "failed";
+        const errorMessage =
+            payload.error ||
+            (isFailed
+                ? "Job failed without a recorded reason. Please retry or contact support."
+                : null);
 
         // Normalize status for consistent API responses
         // statuses: queued | running | processing | collecting_responses | evaluating | completed | success | partial_success | failed

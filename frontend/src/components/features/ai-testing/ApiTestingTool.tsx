@@ -32,6 +32,12 @@ const DEFAULT_REQUEST_TEMPLATE = `{
 
 const PROMPT_PLACEHOLDER_REGEX = /{{\s*prompt\s*}}/i;
 
+// Dot-and-bracket JSON path expression starting with an identifier, e.g.
+// `data.answers[0].message` or `choices[0].message.content`. Must match the
+// backend's RESPONSE_KEY_REGEX in fairness.ts so client-side validation
+// rejects the same inputs the server would (e.g. an email address).
+const RESPONSE_KEY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[\d+\])*$/;
+
 type ApiKeyPlacement = "none" | "auth_header" | "x_api_key" | "query_param" | "body_field";
 
 const API_KEY_OPTIONS: Array<{
@@ -88,6 +94,7 @@ export default function ApiTestingTool({ mode }: ApiTestingToolProps) {
   const [jobStartError, setJobStartError] = useState<string | null>(null);
   const [jobStarting, setJobStarting] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [responseKeyError, setResponseKeyError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [apiKeyPlacement, setApiKeyPlacement] = useState<ApiKeyPlacement>("none");
   const [apiKeyFieldName, setApiKeyFieldName] = useState("");
@@ -142,6 +149,21 @@ export default function ApiTestingTool({ mode }: ApiTestingToolProps) {
     }
   }, [requestTemplate, apiKeyPlacement]);
 
+  useEffect(() => {
+    const trimmed = responseKey.trim();
+    if (!trimmed.length) {
+      setResponseKeyError(null);
+      return;
+    }
+    if (!RESPONSE_KEY_REGEX.test(trimmed)) {
+      setResponseKeyError(
+        "Must be a JSON path like data.answers[0].message",
+      );
+      return;
+    }
+    setResponseKeyError(null);
+  }, [responseKey]);
+
   const trimmedResponseKey = responseKey.trim();
   const trimmedRequestTemplate = requestTemplate.trim();
   const trimmedApiKey = apiKey.trim();
@@ -151,6 +173,7 @@ export default function ApiTestingTool({ mode }: ApiTestingToolProps) {
     apiEndpoint &&
     isValidUrl &&
     trimmedResponseKey &&
+    !responseKeyError &&
     trimmedRequestTemplate &&
     !templateError &&
     (!requiresApiKey || trimmedApiKey),
@@ -469,10 +492,11 @@ export default function ApiTestingTool({ mode }: ApiTestingToolProps) {
                 onChange={(e) => setResponseKey(e.target.value)}
                 placeholder="data.answers[0].message"
                 disabled={jobStarting}
+                aria-invalid={Boolean(responseKeyError)}
                 className={`
                   w-full px-4 py-3 rounded-xl border transition-colors font-mono text-sm
                   bg-background
-                  border-input focus:border-primary
+                  ${responseKeyError ? "border-destructive focus:border-destructive" : "border-input focus:border-primary"}
                   text-foreground
                   placeholder-muted-foreground
                   focus:outline-none focus:ring-2 focus:ring-primary/20
@@ -482,6 +506,12 @@ export default function ApiTestingTool({ mode }: ApiTestingToolProps) {
               <p className="mt-2 text-xs text-muted-foreground">
                 Use dot and bracket notation (e.g. <code>choices[0].message.content</code>) to tell us where your model&apos;s final answer lives.
               </p>
+              {responseKeyError && (
+                <p className="mt-2 text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {responseKeyError}
+                </p>
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

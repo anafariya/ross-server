@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   IconShield,
@@ -23,7 +23,6 @@ import { Separator } from "@/components/ui/separator";
 
 export default function VerifyOTPPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,15 +34,19 @@ export default function VerifyOTPPage() {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Get email from sessionStorage or fallback to query param
+  // Get email from sessionStorage or fallback to query param.
+  // Read the raw query string instead of URLSearchParams.get because the
+  // latter follows form-encoded semantics (decodes "+" to a space), which
+  // corrupts plus-addressed emails like user+tag@example.com.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedEmail = sessionStorage.getItem('pendingVerificationEmail');
-      const queryEmail = searchParams.get("email");
+      const match = window.location.search.match(/[?&]email=([^&]*)/);
+      const queryEmail = match ? decodeURIComponent(match[1]) : null;
       const emailValue = storedEmail || queryEmail || "";
       setEmail(emailValue);
     }
-  }, [searchParams]);
+  }, []);
 
   // Auto-focus first input on mount
   useEffect(() => {
